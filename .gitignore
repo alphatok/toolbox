@@ -1,0 +1,17 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# 拆分输出目录
+*_parts/
+
+# 大视频等原始素材（按需自行决定是否纳入版本控制）
+*.mp4
+*.mkv
+*.mov
+*.avi
+
+# 系统/临时
+.DS_Store
+Thumbs.db

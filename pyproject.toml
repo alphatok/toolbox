@@ -1,0 +1,25 @@
+[project]
+name = "video-toolbox"
+version = "0.1.0"
+description = "视频按时长上限拆分的工具脚本"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    # 本脚本只依赖系统安装的 ffmpeg/ffprobe 二进制, 暂无第三方 Python 依赖。
+    # 需要时可用: uv add <包名> 添加, 例如: uv add rich
+]
+
+[project.scripts]
+# 安装后可用命令行直接调用: split-video 视频.mp4
+split-video = "split_video:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# 把脚本作为独立模块打包
+include = ["split_video.py"]
+
+[tool.uv]
+package = true
