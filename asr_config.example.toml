@@ -26,7 +26,8 @@ upload_prefix = "asr-upload/"
 url_expire_seconds = 7200
 
 [asr]
-# 引擎: 16k_zh 通用中文(推荐) | 8k_zh 电话录音 | 16k_ms 粤语 等
+# 引擎: 16k_zh 通用中文(推荐, 免费额度可用) | 8k_zh 电话录音 | 16k_ms 粤语 等
+# 注意: 16k_zh_large 等大模型引擎需要购买资源包 (报错 UserHasNoAmount 即无额度)
 engine_model_type = "16k_zh"
 # 声道: 1=单声道(16k 引擎仅支持单声道)
 channel_num = 1

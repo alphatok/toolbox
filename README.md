@@ -200,7 +200,7 @@ uv run transcribe https://example.com/meeting.mp3   # 直接使用公网 URL, �
 - 录音总时长不超过 **5 小时**；语音 URL 的音频不超过 **512MB**。
 - 本地文件通过 COS 临时 URL 提交（默认有效期 2 小时，可在配置中调整），桶可设为私有，无需公开。
 - 说话人分离仅支持 `8k_zh` / `16k_zh` / `16k_ms` / `16k_en` 等引擎，且 `ChannelNum` 需为 `1`。
-- `ResTextFormat=4`（NLP 断句）与 `5`（口语转书面）为增值付费能力，默认使用免费的 `0`。
+- `ResTextFormat=4`（NLP 断句）与 `5`（口语转书面）为增值付费能力，默认使用免费的 `0`；`16k_zh_large` 等大模型引擎同样需要购买资源包，免费额度请使用 `16k_zh`。
 - 无腾讯云账号的也可在 [控制台在线体验](https://console.cloud.tencent.com/api/explorer?Product=asr&Version=2019-06-14) 调试接口。
 
 ### 项目结构

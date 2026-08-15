@@ -23,6 +23,7 @@ transcribe.py - 腾讯云录音文件识别: 音频 -> 逐字稿 (markdown, 区�
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -127,7 +128,7 @@ def submit_task(client, models, url, asr_cfg):
 
 
 def poll_task(client, models, task_id, asr_cfg):
-    """轮询识别结果, 返回 (成功与否, ResultDetail, 错误信息)"""
+    """轮询识别结果, 返回 (成功与否, ResultDetail, Result, 错误信息)"""
     req = models.DescribeTaskStatusRequest()
     req.TaskId = task_id
     interval = asr_cfg["poll_interval"]
@@ -137,13 +138,33 @@ def poll_task(client, models, task_id, asr_cfg):
         data = resp.Data
         status = data.Status
         if status == 2:  # 成功
-            return True, data.ResultDetail, ""
+            return True, data.ResultDetail, data.Result, ""
         if status == 3:  # 失败
-            return False, None, data.ErrorMsg
+            return False, None, None, data.ErrorMsg
         # 0=等待 1=执行中
         print(f"  识别中... (status={status}, 每 {interval}s 查询)", flush=True)
         time.sleep(interval)
-    return False, None, "轮询超时"
+    return False, None, None, "轮询超时"
+
+
+# 旧版文本格式一行: [开始秒:毫秒,结束秒:毫秒,说话人] 文本
+_LEGACY_LINE = re.compile(r"\[(\d+):([\d.]+),(\d+):([\d.]+),(\d+)\]\s*(.*)")
+
+
+def parse_legacy_result(text):
+    """解析旧版文本格式 Result, 返回与 parse_result_detail 相同结构的句子列表"""
+    sentences = []
+    for line in (text or "").splitlines():
+        m = _LEGACY_LINE.match(line.strip())
+        if not m:
+            continue
+        s_start, s_start_frac, s_end, s_end_frac, speaker, text = m.groups()
+        if not text:
+            continue
+        start = int(s_start) * 1000 + int(float(s_start_frac) * 1000)
+        end = int(s_end) * 1000 + int(float(s_end_frac) * 1000)
+        sentences.append((int(speaker), start, end, text.strip()))
+    return sentences
 
 
 def parse_result_detail(result_detail):
@@ -257,19 +278,27 @@ def main():
 
     try:
         task_id = submit_task(client, models, url, asr_cfg)
-        ok, result_detail, err = poll_task(client, models, task_id, asr_cfg)
+        ok, result_detail, legacy_result, err = poll_task(client, models, task_id, asr_cfg)
     except TencentCloudSDKException as e:
         sys.exit(f"腾讯云接口调用失败: [{e.code}] {e.message}")
     if not ok:
         sys.exit(f"识别失败: {err}")
 
-    # 原始结果存一份, 便于排查
+    # 原始结果存一份, 便于排查 (新版 JSON 或旧版文本格式)
     out_md = args.output or (os.path.splitext(args.input)[0] + ".md")
-    with open(os.path.splitext(out_md)[0] + ".raw.json", "w", encoding="utf-8") as f:
-        json.dump(json.loads(result_detail), f, ensure_ascii=False, indent=2)
-    log(f"原始结果已保存: {os.path.splitext(out_md)[0] + '.raw.json'}")
+    if result_detail:
+        raw_path = os.path.splitext(out_md)[0] + ".raw.json"
+        with open(raw_path, "w", encoding="utf-8") as f:
+            json.dump(json.loads(result_detail), f, ensure_ascii=False, indent=2)
+    else:
+        raw_path = os.path.splitext(out_md)[0] + ".raw.txt"
+        with open(raw_path, "w", encoding="utf-8") as f:
+            f.write(legacy_result or "")
+    log(f"原始结果已保存: {raw_path}")
 
-    sentences = parse_result_detail(result_detail)
+    # 新版 JSON 或旧版文本格式, 统一解析成句子列表
+    sentences = (parse_result_detail(result_detail) if result_detail
+                 else parse_legacy_result(legacy_result))
     meta = {
         "音频": args.input,
         "时长": fmt_ts(max(s[2] for s in sentences)) if sentences else "-",
