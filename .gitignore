@@ -3,6 +3,9 @@
 __pycache__/
 *.pyc
 
+# Claude Code 会话配置
+.claude/
+
 # 拆分输出目录
 *_parts/
 
