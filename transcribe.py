@@ -41,7 +41,7 @@ DEFAULT_CONFIG = {
     "asr": {
         "engine_model_type": "16k_zh",
         "channel_num": 1,
-        "res_text_format": 0,
+        "res_text_format": 2,
         "speaker_diarization": 1,
         "speaker_number": 0,
         "filter_dirty": 0,
@@ -163,34 +163,63 @@ def parse_legacy_result(text):
             continue
         start = int(s_start) * 1000 + int(float(s_start_frac) * 1000)
         end = int(s_end) * 1000 + int(float(s_end_frac) * 1000)
-        sentences.append((int(speaker), start, end, text.strip()))
+        sentences.append((int(speaker), start, end, clean_cjk_spaces(text.strip())))
     return sentences
+
+
+def clean_cjk_spaces(text):
+    """去掉与中文/中文标点相邻的空格 (词级格式的分词空格), 保留英文单词间空格"""
+    return re.sub(r"(?<=[一-鿿])\s+|\s+(?=[一-鿿，。！？、；：])", "", text or "")
+
+
+def _get(obj, key, default=None):
+    """兼容 dict 与 SDK 模型对象取值"""
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
 
 
 def parse_result_detail(result_detail):
     """
-    解析 ResultDetail JSON, 返回句子列表: [(speaker_id, start_ms, end_ms, text), ...]
-    兼容各 ResTextFormat 的段落/句子结构, 解析失败抛异常由调用方处理。
+    解析 ResultDetail, 返回句子列表: [(speaker_id, start_ms, end_ms, text), ...]
+    兼容两种形态:
+    - SDK 对象列表 (ResTextFormat>=1, 字段: SpeakerId/StartMs/EndMs/SliceSentence/FinalSentence)
+    - JSON 字符串 ({"Result": [...]} 段落/句子嵌套)
     """
-    data = json.loads(result_detail)
-    results = data.get("Result", data if isinstance(data, list) else [])
     sentences = []
-    for slice_ in results:
-        got = False
-        for para in slice_.get("Paragraphs", []):
-            speaker = para.get("SpeakerId", 0)
-            for sent in para.get("Sentences", []):
-                sentences.append((
-                    speaker,
-                    sent.get("StartTime", 0),
-                    sent.get("EndTime", 0),
-                    sent.get("Text", ""),
-                ))
-                got = True
-        # 无段落结构时退化为直接取 Text
-        if not got and slice_.get("Text"):
-            sentences.append((0, slice_.get("StartTime", 0),
-                              slice_.get("EndTime", 0), slice_["Text"]))
+    if isinstance(result_detail, str):
+        try:
+            result_detail = json.loads(result_detail)
+        except (ValueError, TypeError):
+            return sentences
+    if isinstance(result_detail, list):
+        for s in result_detail:
+            text = _get(s, "FinalSentence") or _get(s, "SliceSentence") or _get(s, "Text") or ""
+            sentences.append((
+                int(_get(s, "SpeakerId") or 0),
+                int(_get(s, "StartMs") or _get(s, "StartTime") or 0),
+                int(_get(s, "EndMs") or _get(s, "EndTime") or 0),
+                clean_cjk_spaces(text),
+            ))
+        return sentences
+    if isinstance(result_detail, dict):
+        results = result_detail.get("Result", [])
+        for slice_ in results:
+            got = False
+            for para in slice_.get("Paragraphs", []):
+                speaker = para.get("SpeakerId", 0)
+                for sent in para.get("Sentences", []):
+                    sentences.append((
+                        speaker,
+                        sent.get("StartTime", 0),
+                        sent.get("EndTime", 0),
+                        sent.get("Text", ""),
+                    ))
+                    got = True
+            # 无段落结构时退化为直接取 Text
+            if not got and slice_.get("Text"):
+                sentences.append((0, slice_.get("StartTime", 0),
+                                  slice_.get("EndTime", 0), slice_["Text"]))
     return sentences
 
 
@@ -205,11 +234,12 @@ def to_markdown(sentences, meta):
     lines = ["# 逐字稿", ""]
     lines.append("| 项目 | 内容 |")
     lines.append("| --- | --- |")
-    lines.append(f"| 音频 | {meta['音频']} |")
-    lines.append(f"| 时长 | {meta['时长']} |")
-    lines.append(f"| 识别引擎 | {meta['引擎']} |")
-    lines.append(f"| 说话人分离 | {meta['说话人']} |")
-    lines.append(f"| 识别时间 | {meta['时间']} |")
+    for key, val in (("音频", meta["音频"]), ("时长", meta["时长"]),
+                     ("识别引擎", meta["引擎"]), ("说话人分离", meta["说话人"]),
+                     ("检测到", meta.get("检测到", "-")), ("识别时间", meta["时间"])):
+        lines.append(f"| {key} | {val} |")
+    if meta.get("备注"):
+        lines.append(f"| 备注 | {meta['备注']} |")
     lines.append("")
 
     if not sentences:
@@ -288,8 +318,19 @@ def main():
     out_md = args.output or (os.path.splitext(args.input)[0] + ".md")
     if result_detail:
         raw_path = os.path.splitext(out_md)[0] + ".raw.json"
-        with open(raw_path, "w", encoding="utf-8") as f:
-            json.dump(json.loads(result_detail), f, ensure_ascii=False, indent=2)
+        if isinstance(result_detail, list):  # SDK 对象列表 -> dict 列表
+            raw_items = []
+            for o in result_detail:
+                try:
+                    raw_items.append(json.loads(o.to_json_string()))
+                except Exception:
+                    raw_items.append({a: getattr(o, a, None)
+                                      for a in dir(o) if not a.startswith("_")})
+            with open(raw_path, "w", encoding="utf-8") as f:
+                json.dump(raw_items, f, ensure_ascii=False, indent=2)
+        else:
+            with open(raw_path, "w", encoding="utf-8") as f:
+                json.dump(json.loads(result_detail), f, ensure_ascii=False, indent=2)
     else:
         raw_path = os.path.splitext(out_md)[0] + ".raw.txt"
         with open(raw_path, "w", encoding="utf-8") as f:
@@ -299,14 +340,25 @@ def main():
     # 新版 JSON 或旧版文本格式, 统一解析成句子列表
     sentences = (parse_result_detail(result_detail) if result_detail
                  else parse_legacy_result(legacy_result))
+
+    # 说话人分离质量提示: 开启分离但只检测到 1 人时, 明确告警
+    note = ""
+    speakers = sorted({s[0] for s in sentences})
+    if asr_cfg["speaker_diarization"] and sentences and len(speakers) == 1:
+        note = ("⚠️ 未检测到多个说话人 (免费引擎对短音频/音色相近场景分离能力有限)。"
+                "可加 --speakers N 指定人数重试, 或购买资源包后改用 16k_zh_large 引擎。")
+        log(note)
     meta = {
         "音频": args.input,
         "时长": fmt_ts(max(s[2] for s in sentences)) if sentences else "-",
         "引擎": asr_cfg["engine_model_type"],
         "说话人": ("自动分离" if asr_cfg["speaker_number"] == 0
                    else f"{asr_cfg['speaker_number']} 人"),
+        "检测到": f"{len(speakers)} 人",
         "时间": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
+    if note:
+        meta["备注"] = note
     md = to_markdown(sentences, meta)
     with open(out_md, "w", encoding="utf-8") as f:
         f.write(md)
