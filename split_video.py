@@ -48,8 +48,10 @@ def split_video(path, max_minutes, buffer_seconds, output_dir):
     print(f"将拆分为 {n_parts} 段 (每段目标 ~{seg_seconds} 秒)")
 
     os.makedirs(output_dir, exist_ok=True)
-    base = os.path.splitext(os.path.basename(path))[0]
-    out_pattern = os.path.join(output_dir, f"{base}_part%03d.mp4")
+    base, ext = os.path.splitext(os.path.basename(path))
+    if not ext:
+        ext = ".mp4"
+    out_pattern = os.path.join(output_dir, f"{base}_part%03d{ext}")
 
     run([
         "ffmpeg", "-y", "-i", path,
@@ -62,12 +64,12 @@ def split_video(path, max_minutes, buffer_seconds, output_dir):
     return output_dir
 
 
-def verify(output_dir, max_seconds):
+def verify(output_dir, max_seconds, ext=".mp4"):
     """校验每段时长是否都在上限内"""
     print("\n拆分结果:")
     ok = True
     for f in sorted(os.listdir(output_dir)):
-        if not f.endswith(".mp4"):
+        if not f.endswith(ext):
             continue
         p = os.path.join(output_dir, f)
         try:
@@ -96,8 +98,9 @@ def main():
         sys.exit(f"找不到输入文件: {args.input}")
 
     out_dir = args.output_dir or (os.path.splitext(args.input)[0] + "_parts")
+    ext = os.path.splitext(args.input)[1] or ".mp4"
     split_video(args.input, args.max_minutes, args.buffer, out_dir)
-    verify(out_dir, args.max_minutes * 60)
+    verify(out_dir, args.max_minutes * 60, ext)
 
 
 if __name__ == "__main__":
