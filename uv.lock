@@ -337,6 +337,18 @@ wheels = [
 ]
 
 [[package]]
+name = "tencentcloud-sdk-python-tts"
+version = "3.1.101"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tencentcloud-sdk-python-common" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2a/7f/beb96dca8e88ac4afc07ec22f2f49b5ffe2887c25dba8d87f987b61fc64f/tencentcloud_sdk_python_tts-3.1.101.tar.gz", hash = "sha256:0f1c5580847f967ced3d3483c45ea40df5dadd35ba6bcc5b3187d21523a6179e", size = 12199, upload-time = "2026-05-20T19:20:41.916Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b2/24/29ad64ec810fb5f9f41c15f2905a8db7fef254acb4a326836d3d1c2681ca/tencentcloud_sdk_python_tts-3.1.101-py2.py3-none-any.whl", hash = "sha256:ed40e5d9e5354a3815a9aca309363488da2e6ff1ae8163267642d84ad450effb", size = 15571, upload-time = "2026-05-20T19:20:39.529Z" },
+]
+
+[[package]]
 name = "tomli"
 version = "2.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -397,6 +409,7 @@ source = { editable = "." }
 dependencies = [
     { name = "cos-python-sdk-v5" },
     { name = "tencentcloud-sdk-python-asr" },
+    { name = "tencentcloud-sdk-python-tts" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
 
@@ -404,6 +417,7 @@ dependencies = [
 requires-dist = [
     { name = "cos-python-sdk-v5", specifier = ">=1.9.44" },
     { name = "tencentcloud-sdk-python-asr", specifier = ">=3.1.137" },
+    { name = "tencentcloud-sdk-python-tts", specifier = ">=3.1.101" },
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0" },
 ]
 

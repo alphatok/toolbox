@@ -204,14 +204,63 @@ uv run transcribe https://example.com/meeting.mp3   # 直接使用公网 URL, �
 - **说话人分离**：默认开启自动分离（最多 20 人），输出头部会显示实际检测到的人数；若开启分离但只检测到 1 人，会在输出中给出 ⚠️ 告警。短音频（如 1 分钟内的片段）、音色相近的对话分离可能失效，此时可用 `--speakers N` 指定人数重试；对高质量要求建议购买资源包后使用 `16k_zh_large` 引擎。
 - 无腾讯云账号的也可在 [控制台在线体验](https://console.cloud.tencent.com/api/explorer?Product=asr&Version=2019-06-14) 调试接口。
 
+## tts — 腾讯云语音合成 (文本 → 语音)
+
+把文本合成为语音（mp3/wav），**支持指定音色**（标准音色 1001-1016、精品音色、大模型音色），与 `transcribe` 正好形成闭环：会议录音 → 逐字稿 → 语音播报。
+
+> ⚠️ 使用前需在 [腾讯云语音合成控制台](https://console.cloud.tencent.com/tts) **开通服务**（基础版有免费额度；未开通会报 `ServerNotOpen`）。密钥复用 `asr_config.toml` 的 `[credentials]`，默认参数在 `[tts]` 段。
+
+### 使用 uv 运行
+
+```bash
+uv run tts "欢迎光临，请问有什么可以帮您？" -o hello.mp3    # 默认音色 1001 智瑜
+uv run tts 讲稿.txt --voice 1004 --speed 1                 # 男声 1004 智云, 稍快
+uv run tts 讲稿.txt --voice 1015                           # 童声 1015 智萌
+uv run tts --list-voices                                   # 查看内置标准音色
+uv run tts 长文本.txt -o long.mp3                          # 长文本自动分段合成后拼接
+```
+
+### 参数
+
+| 参数 | 说明 | 默认值 |
+| --- | --- | --- |
+| `text` | 要合成的文本（与 `--file` 二选一） | — |
+| `-f, --file` | 文本文件路径（UTF-8） | — |
+| `-o, --output` | 输出音频路径 | `<文本首字或文件名>.mp3` |
+| `--voice` | 音色 ID：标准 1001-1016（内置表可查）；精品 101001+、大模型 200001+ 按文档编号 | 配置值 `1001` |
+| `--model-type` | 1=标准/精品音色（默认）\| 2=大模型音色（需购买资源包） | `1` |
+| `--speed` | 语速 -2~6 | `0` |
+| `--volume` | 音量 -5~5 | `0` |
+| `--sample-rate` | 16000 / 24000 / 48000 | `24000` |
+| `--codec` | mp3 / wav | `mp3` |
+| `--list-voices` | 列出内置标准音色 | — |
+
+默认参数均可在 `asr_config.toml` 的 `[tts]` 段修改。
+
+### 内置标准音色（节选）
+
+| ID | 音色 | ID | 音色 |
+| --- | --- | --- | --- |
+| 1001 | 智瑜 女声·中文·客服 | 1004 | 智云 男声·中文·通用 |
+| 1002 | 智聆 女声·中文·通用 | 1006 | 智言 男声·中文·英文混读 |
+| 1015 | 智萌 女声·童声 | 1016 | 智皓 男声·童声 |
+
+完整标准音色用 `--list-voices` 查看；精品/大模型音色见腾讯云文档「音色列表」。
+
+### 说明
+
+- 长文本（约 450 字以上）会自动按句子分段合成，再用 ffmpeg 无损拼接，无需手工切分。
+- 每段合成实时返回，适合讲稿/播报/门店语音等场景；超大文本可考虑异步接口（后续可按需扩展）。
+
 ### 项目结构
 
 ```
 split_video.py    # 视频按时长拆分
 convert_audio.py  # 音频格式转换 (m4a -> mp3)
 transcribe.py     # 腾讯云录音文件识别 -> 逐字稿 (md)
-pyproject.toml    # uv 工程配置（含 split-video / convert-audio / transcribe 命令行入口）
+tts.py            # 腾讯云语音合成: 文本 -> 语音 (支持指定音色)
+pyproject.toml    # uv 工程配置（含 split-video / convert-audio / transcribe / tts 命令行入口）
 uv.lock           # 锁定的依赖
-asr_config.example.toml  # 腾讯云识别配置模板 (复制为 asr_config.toml 填写)
+asr_config.example.toml  # 腾讯云配置模板 (复制为 asr_config.toml 填写: 密钥/识别/合成/待办)
 README.md         # 本说明
 ```
