@@ -1,18 +1,20 @@
 [project]
 name = "toolbox"
-version = "0.2.0"
+version = "0.3.0"
 description = "个人音视频处理工具箱"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    # 脚本只依赖系统安装的 ffmpeg/ffprobe 二进制, 暂无第三方 Python 依赖。
-    # 需要时可用: uv add <包名> 添加, 例如: uv add rich
+    "cos-python-sdk-v5>=1.9.44",   # 音频上传 COS 用
+    "tencentcloud-sdk-python-asr>=3.1.137",  # 腾讯云语音识别 SDK
+    "tomli>=2.0 ; python_full_version < '3.11'",  # Python 3.9/3.10 读 TOML 配置用
 ]
 
 [project.scripts]
-# 安装后可用命令行直接调用: split-video 视频.mp4 / convert-audio 音频.m4a
+# 安装后可用命令行直接调用: split-video 视频.mp4 / convert-audio 音频.m4a / transcribe 会议录音.mp3
 split-video = "split_video:main"
 convert-audio = "convert_audio:main"
+transcribe = "transcribe:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -20,7 +22,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 # 把脚本作为独立模块打包
-include = ["split_video.py", "convert_audio.py"]
+include = ["split_video.py", "convert_audio.py", "transcribe.py"]
 
 [tool.uv]
 package = true

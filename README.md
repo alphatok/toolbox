@@ -131,12 +131,86 @@ $ python convert_audio.py demo.m4a --bitrate 128k
 - 默认忽略封面图（`-vn`），只保留音轨。
 - 除 m4a 外，也可直接指定任意 ffmpeg 支持的音频/视频文件（如 `.wav`/`.flac`/`.mp4`），只取其音轨转成 mp3。
 
+## transcribe — 腾讯云录音文件识别 (音频 → 逐字稿)
+
+把录音转成**区分发言人**的 markdown 逐字稿。基于腾讯云「录音文件识别」异步接口（`CreateRecTask` + `DescribeTaskStatus`），开启说话人分离（SpeakerDiarization），自动输出带时间戳、按发言人分组的 md 文档。
+
+典型链路：`convert-audio`（m4a 转 mp3）→ `transcribe`（mp3 → 逐字稿 md）。
+
+### 首次配置（只需一次）
+
+1. **获取 API 密钥**：[访问管理 CAM](https://console.cloud.tencent.com/cam/capi) 创建子账号密钥，仅授权 `语音识别(ASR)` 与 `COS` 相关权限，得到 `SecretId` / `SecretKey`。
+2. **创建 COS 存储桶**：[COS 控制台](https://console.cloud.tencent.com/cos/bucket) 新建一个桶（如 `my-audio-1250000000`），用于临时存放待识别的音频（本地文件需先上传生成临时 URL，超过 5MB 的音频无法直接提交）。
+3. **填写配置**：
+
+```bash
+cp asr_config.example.toml asr_config.toml   # 然后编辑填入密钥与桶名
+```
+
+`asr_config.toml` 已加入 `.gitignore`，密钥不会提交到仓库。
+
+### 使用 uv 运行
+
+```bash
+uv run transcribe 会议录音.mp3                 # 自动上传 COS → 识别 → 输出 会议录音.md
+uv run transcribe 会议录音.mp3 -o 纪要.md
+uv run transcribe 会议录音.mp3 --speakers 3    # 指定 3 个发言人
+uv run transcribe https://example.com/meeting.mp3   # 直接使用公网 URL, 无需 COS
+```
+
+### 参数
+
+| 参数 | 说明 | 默认值 |
+| --- | --- | --- |
+| `input` | 音频文件（自动上传 COS）或 http(s) URL | 必填 |
+| `-o, --output` | 输出 .md 路径 | `<音频名>.md` |
+| `--config` | 配置文件路径 | `asr_config.toml` |
+| `--speakers` | 指定说话人数 1-10 | `0`（自动分离，最多 20 人） |
+
+引擎、声道、结果格式、过滤等更多选项在 `asr_config.toml` 的 `[asr]` 段配置。
+
+### 输出示例
+
+```markdown
+# 逐字稿
+
+| 项目 | 内容 |
+| --- | --- |
+| 音频 | 会议录音.mp3 |
+| 时长 | 01:23:45 |
+| 识别引擎 | 16k_zh |
+| 说话人分离 | 自动分离 |
+| 识别时间 | 2026-08-15 18:00:00 |
+
+## 发言人 1 (SpeakerId=0)
+
+> 00:00:03 - 00:00:12
+大家好，今天会议主要讨论下半年规划。
+
+## 发言人 2 (SpeakerId=1)
+
+> 00:00:15 - 00:00:28
+好的，我先同步一下目前的进展。
+```
+
+识别原始结果（JSON）会同步保存为 `<输出名>.raw.json`，便于排查。
+
+### 说明与限制
+
+- 录音总时长不超过 **5 小时**；语音 URL 的音频不超过 **512MB**。
+- 本地文件通过 COS 临时 URL 提交（默认有效期 2 小时，可在配置中调整），桶可设为私有，无需公开。
+- 说话人分离仅支持 `8k_zh` / `16k_zh` / `16k_ms` / `16k_en` 等引擎，且 `ChannelNum` 需为 `1`。
+- `ResTextFormat=4`（NLP 断句）与 `5`（口语转书面）为增值付费能力，默认使用免费的 `0`。
+- 无腾讯云账号的也可在 [控制台在线体验](https://console.cloud.tencent.com/api/explorer?Product=asr&Version=2019-06-14) 调试接口。
+
 ### 项目结构
 
 ```
 split_video.py    # 视频按时长拆分
 convert_audio.py  # 音频格式转换 (m4a -> mp3)
-pyproject.toml    # uv 工程配置（含 split-video / convert-audio 命令行入口）
+transcribe.py     # 腾讯云录音文件识别 -> 逐字稿 (md)
+pyproject.toml    # uv 工程配置（含 split-video / convert-audio / transcribe 命令行入口）
 uv.lock           # 锁定的依赖
+asr_config.example.toml  # 腾讯云识别配置模板 (复制为 asr_config.toml 填写)
 README.md         # 本说明
 ```

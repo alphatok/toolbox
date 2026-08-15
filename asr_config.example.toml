@@ -1,0 +1,48 @@
+# ============================================================
+# 腾讯云语音识别 (录音文件识别) 配置模板
+# 使用方法: 复制本文件为 asr_config.toml 并填写后运行:
+#     cp asr_config.example.toml asr_config.toml
+#     uv run transcribe 会议录音.mp3
+# asr_config.toml 已加入 .gitignore, 不会提交到仓库。
+# ============================================================
+
+[credentials]
+# 腾讯云 API 密钥: https://console.cloud.tencent.com/cam/capi
+# 注意: 请使用"子账号"密钥并仅授予 语音识别(ASR) 与 COS 相关权限。
+secret_id = "AKIDxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+secret_key = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# 地域: ap-guangzhou(广州, 默认) / ap-beijing / ap-shanghai / ap-hongkong 等
+region = "ap-guangzhou"
+
+[cos]
+# 本地音频文件需要上传 COS 生成临时 URL 后才能提交识别。
+# 桶名格式: <bucket名>-<appid>, 例如 my-audio-1250000000
+# 在 https://console.cloud.tencent.com/cos/bucket 创建并填写。
+# 若只使用公网音频 URL 可留空。
+bucket = ""
+# 上传到桶内的目录前缀 (可选)
+upload_prefix = "asr-upload/"
+# 临时 URL 有效期(秒), 需大于识别耗时, 建议 7200
+url_expire_seconds = 7200
+
+[asr]
+# 引擎: 16k_zh 通用中文(推荐) | 8k_zh 电话录音 | 16k_ms 粤语 等
+engine_model_type = "16k_zh"
+# 声道: 1=单声道(16k 引擎仅支持单声道)
+channel_num = 1
+# 结果格式: 0=基础识别(段落+说话人, 推荐) | 4=NLP断句(增值付费) | 5=口语转书面(增值付费)
+res_text_format = 0
+# 说话人分离: 1=开启 | 0=关闭
+speaker_diarization = 1
+# 说话人数: 0=自动分离(最多 20 人) | 1-10=指定人数
+speaker_number = 0
+# 脏词过滤: 0=不过滤 | 1=过滤 | 2=替换为 *
+filter_dirty = 0
+# 标点过滤: 0=不过滤 | 1=过滤句末标点 | 2=过滤全部
+filter_punc = 0
+# 语气词过滤: 0=不过滤 | 1=过滤指定语气词 | 2=过滤全部
+filter_modal = 0
+# 轮询间隔(秒)
+poll_interval = 5
+# 识别总超时(秒), 最长音频 5 小时
+timeout = 1800
