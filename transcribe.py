@@ -257,8 +257,14 @@ def to_markdown(sentences, meta):
             blocks.append({"speaker": speaker, "start": start,
                            "end": end, "texts": [text]})
 
-    for i, b in enumerate(blocks, 1):
-        lines.append(f"## 发言人 {i} (SpeakerId={b['speaker']})")
+    # 稳定发言人编号: 按首次出现顺序分配, 同一 SpeakerId 始终同名
+    labels = {}
+    for b in blocks:
+        if b["speaker"] not in labels:
+            labels[b["speaker"]] = f"发言人 {len(labels) + 1}"
+
+    for b in blocks:
+        lines.append(f"## {labels[b['speaker']]} (SpeakerId={b['speaker']})")
         lines.append("")
         lines.append(f"> {fmt_ts(b['start'])} - {fmt_ts(b['end'])}")
         lines.append("")
