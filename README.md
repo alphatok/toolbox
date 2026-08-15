@@ -1,6 +1,6 @@
 # toolbox
 
-个人视频处理工具箱。
+个人音视频处理工具箱。
 
 ## split_video — 视频按时长拆分
 
@@ -89,11 +89,54 @@ $ python split_video.py demo.mp4 --max-minutes 1
 | 某段出现 `超长!` 警告 | 视频关键帧间隔过大，减小 `--max-minutes` 重试 |
 | `buffer 过大` 报错 | `--buffer` 大于 `--max-minutes` 对应秒数，调小 buffer 或调大 max-minutes |
 
+## convert_audio — 音频格式转换 (m4a 转 mp3)
+
+把 m4a 音频转换为 mp3（使用 `libmp3lame` 编码），保留原文件元数据（标题、艺术家等），方便在不支持 m4a 的软件/设备上播放。
+
+### 使用 uv 运行
+
+```bash
+uv run convert-audio 音频.m4a
+uv run convert-audio 音频.m4a --bitrate 320k
+uv run convert-audio *.m4a --output-dir mp3/
+uv run convert-audio 音乐目录/          # 转换目录下所有 .m4a
+```
+
+不借助 uv 也可直接运行：
+
+```bash
+python convert_audio.py 音频.m4a
+```
+
+### 参数
+
+| 参数 | 说明 | 默认值 |
+| --- | --- | --- |
+| `inputs` | 输入文件或目录（可多个，目录会转换其中所有 `.m4a`） | 必填 |
+| `--bitrate` | mp3 比特率 | `192k` |
+| `--output-dir` | 输出目录 | 与源文件同目录 |
+
+### 运行示例
+
+```text
+$ python convert_audio.py demo.m4a --bitrate 128k
+> ffmpeg -y -i demo.m4a -vn -c:a libmp3lame -b:a 128k -map_metadata 0 -id3v2_version 3 demo.mp3
+转换完成: demo.m4a -> demo.mp3
+```
+
+### 说明
+
+- 输出文件与原文件共存（同名不同扩展名），**不删除原文件**。
+- 转换保留原文件元数据（标题/艺术家/专辑等），并写入兼容性好的 ID3v2.3 标签。
+- 默认忽略封面图（`-vn`），只保留音轨。
+- 除 m4a 外，也可直接指定任意 ffmpeg 支持的音频/视频文件（如 `.wav`/`.flac`/`.mp4`），只取其音轨转成 mp3。
+
 ### 项目结构
 
 ```
-split_video.py    # 拆分脚本
-pyproject.toml    # uv 工程配置（含 split-video 命令行入口）
+split_video.py    # 视频按时长拆分
+convert_audio.py  # 音频格式转换 (m4a -> mp3)
+pyproject.toml    # uv 工程配置（含 split-video / convert-audio 命令行入口）
 uv.lock           # 锁定的依赖
 README.md         # 本说明
 ```
